@@ -12,7 +12,7 @@ setuptools.setup(
     long_description = long_description,
     long_description_content_type = 'text/markdown',
     packages=setuptools.find_packages(),
-    url = 'https://github.com/udayRage/PAMI',
+    url = 'https://github.com/udayRage/geoAnalytics',
     license='GPLv3',
     install_requires=[            # All necessary packages utilized by our PAMI software
         'psutil',
