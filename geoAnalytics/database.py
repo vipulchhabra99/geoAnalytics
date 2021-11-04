@@ -1,4 +1,4 @@
-from config import config
+from geoAnalytics.config import config
 import psycopg2
 import pandas as pd
 from geoAnalytics import csv2raster as c2r
