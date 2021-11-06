@@ -67,12 +67,12 @@ class database:
             os.remove("temp_" + filename)
         
     def deleteTable(tableName):
-        delete_table = "delete table " + tableName + ";"
+        delete_table = "drop table " + tableName + ";"
         database.curr.execute(delete_table)
         database.conn.commit()
         
     def cloneTable(tableName, cloneTableName):
-        clone_table = "create table " + cloneTableName + "as (select * from " + tableName + ");"
+        clone_table = "create table " + cloneTableName + " as (select * from " + tableName + ");"
         database.curr.execute(clone_table)
         database.conn.commit()
         
