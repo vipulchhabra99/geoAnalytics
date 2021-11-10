@@ -241,7 +241,7 @@ class database:
         my_df = pd.DataFrame()
         file = glob.glob(path)
         listOfDataframes = []
-        mainDataFrame = pd.DataFrame
+        mainDataFrame = pd.DataFrame()
         out_csv = ('rawData.tsv')
         text = ''
         header = ['0']
