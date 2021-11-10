@@ -1,12 +1,12 @@
-from geoAnalytics.config import config
+from config import config
 from shapely import geos, wkb, wkt
 import psycopg2
 import pandas as pd
-from geoAnalytics import csv2raster as c2r
+import csv2raster as c2r
 import os
 import subprocess
 import glob
-from geoAnalytics import raster2tsv
+import raster2tsv
 
 class database:
     conn = ""
@@ -114,6 +114,78 @@ class database:
         if os.path.exists("temp_" + filename):
             os.remove("temp_" + filename)
         
+    from osgeo import gdal
+import sys
+import os
+import numpy as Numeric
+ 
+def r2tsv(startBand, endBand, srcfile, dstfile):
+    """
+    Convert a raster to a tsv file
+
+    :param startBand: start band
+    :param endBand: end band
+    :param srcfile: source file
+    :param dstfile: destination file
+    """
+    band_nums = range(startBand, endBand + 1)
+    srcwin = None
+    if band_nums == []: band_nums = [1]
+
+    # Open source file. 
+    srcds = gdal.Open( srcfile )
+    if srcds is None:
+        print('Could not open %s.' % srcfile)
+        sys.exit( 1 )
+
+    bands = []
+    for band_num in band_nums: 
+        band = srcds.GetRasterBand(band_num)
+        if band is None:
+            print('Could not get band %d' % band_num)
+            sys.exit( 1 )
+        bands.append(band)
+    gt = srcds.GetGeoTransform()
+  
+    # Collect information on all the source files.
+    if srcwin is None:
+        srcwin = (0,0,srcds.RasterXSize,srcds.RasterYSize)
+
+    # Open the output file.
+    if dstfile is not None:
+        dst_fh = open(dstfile,'wt')
+    else:
+        dst_fh = sys.stdout
+    band_format = ("%g " * len(bands)).rstrip() + '\n'
+
+    # Setup an appropriate print format.
+    if abs(gt[0]) < 180 and abs(gt[3]) < 180 \
+       and abs(srcds.RasterXSize * gt[1]) < 180 \
+       and abs(srcds.RasterYSize * gt[5]) < 180:
+        format = '%.10g %.10g %s'
+    else:
+        format = '%.3f %.3f %s'
+
+    # Loop emitting data.
+    for y in range(srcwin[1],srcwin[1]+srcwin[3]):
+        data = []
+        for band in bands:
+            band_data = band.ReadAsArray( srcwin[0], y, srcwin[2], 1 )    
+            band_data = Numeric.reshape( band_data, (srcwin[2],) )
+            data.append(band_data)
+
+        for x_i in range(0,srcwin[2]):
+            x = x_i + srcwin[0]
+            geo_x = gt[0] + (x+0.5) * gt[1] + (y+0.5) * gt[2]
+            geo_y = gt[3] + (x+0.5) * gt[4] + (y+0.5) * gt[5]
+            x_i_data = []
+            for i in range(len(bands)):
+                x_i_data.append(data[i][x_i])
+            band_str = band_format % tuple(x_i_data)
+            line = format % (float(geo_x),float(geo_y), band_str)
+            dst_fh.write( line )
+
+
             
     def insertTIFF(table="",filename="", bands=1, SRID=4326):
         """
@@ -125,10 +197,7 @@ class database:
         :param SRID: spatial reference ID
         """
         query = "python3 gdal2xyz.py"
-        for i in range(1,bands+1):
-            query += " -band " + str(i)
-        query += " " + str(filename) + ' ' + os.getcwd() + "/temp1.txt"
-        subprocess.getstatusoutput(query)
+        database.r2tsv(1,bands,filename,'temp1.txt')
         with open("temp1.txt") as inFile:
             with open("temp2.txt", "w") as outFile:
                 for lines in inFile:
