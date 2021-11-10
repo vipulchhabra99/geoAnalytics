@@ -1,12 +1,12 @@
-from config import config
+from geoAnalytic.config import config
+import geoAnalytics.csv2raster as c2r
 from shapely import geos, wkb, wkt
 import psycopg2
 import pandas as pd
-import csv2raster as c2r
 import os
 import subprocess
 import glob
-import raster2tsv
+import geoAnalytics.raster2tsv
 
 class database:
     conn = ""
