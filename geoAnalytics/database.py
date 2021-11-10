@@ -127,7 +127,7 @@ class database:
         query = "python3 gdal2xyz.py"
         for i in range(1,bands+1):
             query += " -band " + str(i)
-        query += " " + str(filename) + " temp1.txt"
+        query += " " + str(filename) + ' ' + os.getcwd() + "/temp1.txt"
         subprocess.getstatusoutput(query)
         with open("temp1.txt") as inFile:
             with open("temp2.txt", "w") as outFile:
@@ -142,7 +142,6 @@ class database:
                     buffer = "POINT(" + Latitude + " " + Longitude + ")"
                     p = wkt.loads(buffer)
                     new = wkb.dumps(p, hex=True, srid=SRID)
-                    print(new)
 
                     sqlLine = new
                     for w in word[2:]:
