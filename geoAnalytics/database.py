@@ -83,11 +83,11 @@ class database:
                 dbFile.close()
         database.testDatabaseConnection()
 
-    def createRepository(RepositoryName, totalBands, SRID=4326, coordsFrontOrBack='front'):
+    def createRepository(repositoryName, totalBands, SRID=4326, coordsFrontOrBack='front'):
         """
-        Create a Repository in the database
+        Create a repository in the database
 
-        :param RepositoryName: name of the Repository
+        :param repositoryName: name of the repository
         :param totalBands: total number of bands
         :param SRID: spatial reference ID
         :param coordsFrontOrBack: front or back
@@ -100,7 +100,7 @@ class database:
             query += 'b' + str(i) + ' float,'
         if coordsFrontOrBack == 'back':
             query += "geog geometry(POINT," + str(SRID) + ")"
-        createRepository = "create table " + RepositoryName + "(" + query + ");"
+        createRepository = "create table " + repositoryName + "(" + query + ");"
         if createRepository[-3:] == ",);":
             createRepository = createRepository[:-3] + ");"
         database.curr.execute(createRepository)
@@ -248,11 +248,11 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
 
 
 
-    def insertLBL(Repository, inputFolder, startBand, endBand):
+    def insertLBL(repository, inputFolder, startBand, endBand):
         """
         Insert a LBL file into the database
 
-        :param Repository: name of the Repository
+        :param repository: name of the repository
         :param inputFolder: folder containing the LBL files
         :param startBand: start band
         :param endBand: end band
@@ -302,43 +302,43 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
                 outFile.close()
             inFile.close()
 
-        database.insertCSVFile("rawData2.tsv", ' ', Repository)
+        database.insertCSVFile("rawData2.tsv", ' ', repository)
         if os.path.exists("rawData.tsv"):
             os.remove("rawData.tsv")
         if os.path.exists("rawData2.tsv"):
             os.remove("rawData2.tsv")
 
-    def deleteRepository(RepositoryName):
+    def deleteRepository(repositoryName):
         """
-        Delete a Repository from the database
+        Delete a repository from the database
 
-        :param RepositoryName: name of the Repository
+        :param repositoryName: name of the repository
         """
-        delete_Repository = "drop table " + RepositoryName + ";"
-        database.curr.execute(delete_Repository)
+        deleteRepository = "drop table " + repositoryName + ";"
+        database.curr.execute(deleteRepository)
         database.conn.commit()
         print('Repository deleted')
 
-    def cloneRepository(RepositoryName, cloneRepositoryName):
+    def cloneRepository(repositoryName, cloneRepositoryName):
         """
-        Clone a Repository from the database
+        Clone a repository from the database
 
-        :param RepositoryName: name of the Repository
-        :param cloneRepositoryName: name of the cloned Repository
+        :param repositoryName: name of the repository
+        :param cloneRepositoryName: name of the cloned repository
         """
-        clone_Repository = "create table " + cloneRepositoryName + " as (select * from " + RepositoryName + ");"
-        database.curr.execute(clone_Repository)
+        cloneRepository = "create table " + cloneRepositoryName + " as (select * from " + repositoryName + ");"
+        database.curr.execute(cloneRepository)
         database.conn.commit()
         print('Repository cloned')
 
-    def changeRepositoryName(RepositoryName, newRepositoryName):
+    def changeRepositoryName(repositoryName, newRepositoryName):
         """
-        Change the name of a Repository in the database
+        Change the name of a repository in the database
         
-        :param RepositoryName: name of the Repository
-        :param newRepositoryName: new name of the Repository
+        :param repositoryName: name of the repository
+        :param newRepositoryName: new name of the repository
         """
-        changeRepositoryName = "ALTER TABLE IF EXISTS " + RepositoryName + " RENAME TO " + newRepositoryName + ";"
+        changeRepositoryName = "ALTER TABLE IF EXISTS " + repositoryName + " RENAME TO " + newRepositoryName + ";"
         database.curr.execute(changeRepositoryName)
         database.conn.commit()
         print('Repository name changed')
@@ -347,11 +347,11 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
 
         # This function will delete the band number attribute from the table.
 
-    def getRaster(RepositoryName, rasterFileName, Xmin, Ymin, Xmax=0, Ymax=0, Bands="*"):
+    def getRaster(repositoryName, rasterFileName, Xmin, Ymin, Xmax=0, Ymax=0, Bands="*"):
         """
         Get a raster image from the database
 
-        :param RepositoryName: name of the Repository
+        :param repositoryName: name of the repository
         :param rasterFileName: name of the raster file
         :param Xmin: minimum X coordinate
         :param Ymin: minimum Y coordinate
@@ -362,7 +362,7 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         # connect to database
         # create geoTIFF file
         # gDal transform to geoTIFF
-        df = database.getDataframeForEnvelope(RepositoryName, Xmin, Ymin, Xmax, Ymax, Bands)
+        df = database.getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands)
         database.dataFrame2Raster(df, rasterFileName)
 
     def dataFrame2Raster(dataframe, rasterFileName):
@@ -409,11 +409,11 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         buffer = 'rm output*.nc'
         print(subprocess.getstatusoutput(buffer))
 
-    def getDataframeForEnvelope(RepositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
+    def getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a given envelope
 
-        :param RepositoryName: name of the Repository
+        :param repositoryName: name of the repository
         :param Xmin: minimum X coordinate
         :param Ymin: minimum Y coordinate
         :param Xmax: maximum X coordinate
@@ -426,7 +426,7 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         # create geoTIFF file
         # gDal transform to geoTIFF
 
-        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + RepositoryName + " WHERE " + RepositoryName + ".geog && ST_MakeEnvelope(" + str(
+        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + repositoryName + " WHERE " + repositoryName + ".geog && ST_MakeEnvelope(" + str(
             Xmin) + ',' + str(Ymin) + ',' + str(Xmax) + ',' + str(Ymax) + ");"
         dataFrameEnvelope = pd.read_sql_query(query, database.conn)
         if Bands == "*":
@@ -434,11 +434,11 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         print('dataframe created')
         return dataFrameEnvelope
 
-    def KNN(RepositoryName, X, Y, k=1000, Bands="*", SRID=4326):
+    def KNN(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a point and its neighbors
 
-        :param RepositoryName: name of the Repository
+        :param repositoryName: name of the repository
         :param X: X coordinate
         :param Y: Y coordinate
         :param k: number of neighbours
@@ -446,7 +446,7 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         :param SRID: spatial reference ID
         """
         query = "SELECT ST_X(geom::geometry) as x, ST_Y(geom::geometry) as y, " + str(Bands) + " FROM " + str(
-            RepositoryName) + " ORDER BY " + str(RepositoryName) + ".geom <-> 'SRID=" + str(SRID) + ";POINT(" + str(
+            repositoryName) + " ORDER BY " + str(repositoryName) + ".geom <-> 'SRID=" + str(SRID) + ";POINT(" + str(
             X) + ' ' + str(Y) + ")'::geometry limit " + str(k) + ";"
         dataFrameKNN = pd.read_sql_query(query, database.conn)
         if Bands == "*":
@@ -454,11 +454,11 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         print('dataframe created')
         return dataFrameKNN
 
-    def getRasterImageKNN(RepositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
+    def getRasterImageKNN(repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
         """
         Get a raster image from the database for a point and its neighbors
 
-        :param RepositoryName: name of the Repository
+        :param repositoryName: name of the repository
         :param rasterFileName: name of the raster file
         :param X: X coordinate
         :param Y: Y coordinate
@@ -468,5 +468,5 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         # connect to database
         # create geoTIFF file
         # gDal transform to geoTIFF
-        df = database.KNN(RepositoryName, X, Y, k, Bands)
+        df = database.KNN(repositoryName, X, Y, k, Bands)
         database.dataFrame2Raster(df, rasterFileName)
