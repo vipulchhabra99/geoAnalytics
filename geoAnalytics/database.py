@@ -83,7 +83,7 @@ class database:
                 dbFile.close()
         database.testDatabaseConnection()
 
-    def createRepository(repositoryName, totalBands, SRID=4326, coordsFrontOrBack='front'):
+    def createRepository(repositoryName, totalBands, SRID=4326):
         """
         Create a repository in the database
 
@@ -93,93 +93,81 @@ class database:
         :param coordsFrontOrBack: front or back
         """
         # total bands is number
-        query = ""
-        if coordsFrontOrBack == 'front':
-            query += "geog geometry(POINT," + str(SRID) + "),"
-        for i in range(1, totalBands + 1):
+        query = "geog geometry(POINT," + str(SRID) + "),"
+        for i in range(1, totalBands):
             query += 'b' + str(i) + ' float,'
-        if coordsFrontOrBack == 'back':
-            query += "geog geometry(POINT," + str(SRID) + ")"
-        createRepository = "create table " + repositoryName + "(" + query + ");"
-        if createRepository[-3:] == ",);":
-            createRepository = createRepository[:-3] + ");"
-        database.curr.execute(createRepository)
+        query += 'b' + str(i) + ' float'
+        database.curr.execute("create table " + repositoryName + "(" + query + ")")
         database.conn.commit()
         print('Repository created')
 
-def insertRaster(Repository, filename, totalBands, SRID=4326):
-    """
-    Insert a TIFF file into the database
-
-    :param Repository: name of the Repository
-    :param filename: name of the TIFF file
-    :param totalBands: number of bands
-    :param SRID: spatial reference ID
-    """
-    query = "python3 gdal2xyz.py"
-    database.__r2tsv(totalBands, filename)
-    with open("temp1.txt") as inFile:
-        with open("temp2.txt", "w") as outFile:
-            for lines in inFile:
-                word = lines.strip()
-                word = word.split(" ")
-
-                Latitude = word[0]
-                # word.pop(0)
-                Longitude = word[1]
-                # word.pop(0)
-                buffer = "POINT(" + Latitude + " " + Longitude + ")"
-                p = wkt.loads(buffer)
-                new = wkb.dumps(p, hex=True, srid=SRID)
-
-                sqlLine = new
-                for w in word[2:]:
-                    sqlLine += ' ' + w
-                sqlLine += "\n"
-                outFile.write(sqlLine)
-            outFile.close()
-        inFile.close()
-
-    database.insertCSVFile("temp2.txt", ' ', Repository)
-    if os.path.exists("temp1.txt"):
-        os.remove("temp1.txt")
-    if os.path.exists("temp2.txt"):
-        os.remove("temp2.txt")
-
-    def insertCSV(filename, seperator, RepositoryName):
+    def insertRaster(self, repositoryName, fileName, totalBands, SRID=4326):
         """
-        Insert a CSV file into the database
+        Insert a TIFF file into the database
 
-        :param filename: name of the CSV file
-        :param seperator: seperator
-        :param RepositoryName: name of the Repository
+        :param Repository: name of the Repository
+        :param filename: name of the TIFF file
+        :param totalBands: number of bands
+        :param SRID: spatial reference ID
         """
-
-        with open(filename) as inFile:
-            with open("temp_" + filename, "w") as tempFile:
+        query = "python3 gdal2xyz.py"
+        tempFile = database.__r2tsv(totalBands, fileName)
+        with open(tempFile) as inFile:
+            tempFile2 = "temp2.txt"  # create a randomFileName
+            with open(tempFile2, "w") as outFile:
                 for lines in inFile:
                     word = lines.strip()
-                    word = word.split(seperator)
-                    sqlLine = ""
-                    for w in word:
-                        sqlLine += w + " "
-                    sqlLine = sqlLine[:-1] + "\n"
-                    tempFile.write(sqlLine)
-                tempFile.close()
+                    word = word.split(" ")
+
+                    new = wkb.dumps(wkt.loads("POINT(" + word[0] + " " + word[1] + ")"), hex=True, srid=SRID)
+
+                    sqlLine = new
+                    for w in word[2:]:
+                        sqlLine += ' ' + w
+                    sqlLine += "\n"
+                    outFile.write(sqlLine)
+                outFile.close()
             inFile.close()
 
-        copy_file = "copy " + RepositoryName + " from '" + str(
-            os.getcwd()) + "/temp_" + filename + "' delimiters '" + ' ' + "' csv;"
-        database.curr.execute(copy_file)
+        database.insertCSVFile(tempFile2, repositoryName)
+        if os.path.exists(tempFile):
+            os.remove(tempFile)
+        if os.path.exists(tempFile2):
+            os.remove(tempFile2)
 
-        # finished
-        database.conn.commit()
-        print('file has been inserted')
+        def insertCSV(filename, repositoryName, seperator=' '):
+            """
+            Insert a CSV file into the database
 
-        if os.path.exists("temp_" + filename):
-            os.remove("temp_" + filename)
+            :param filename: name of the CSV file
+            :param repositoryName: name of the Repository
+            :param seperator: seperator
+            """
+            with open(filename) as inFile:
+                with open("temp_" + filename, "w") as tempFile:
+                    for lines in inFile:
+                        word = lines.strip()
+                        word = word.split(seperator)
+                        sqlLine = ""
+                        for w in word:
+                            sqlLine += w + " "
+                        sqlLine = sqlLine[:-1] + "\n"
+                        tempFile.write(sqlLine)
+                    tempFile.close()
+                inFile.close()
 
-    def __r2tsv(self,  endBand, srcfile):
+            copy_file = "copy " + repositoryName + " from '" + str(
+                os.getcwd()) + "/temp_" + filename + "' delimiters '" + ' ' + "' csv;"
+            database.curr.execute(copy_file)
+
+            # finished
+            database.conn.commit()
+            print('file has been inserted')
+
+            if os.path.exists("temp_" + filename):
+                os.remove("temp_" + filename)
+
+    def __r2tsv(self, endBand, srcfile):
         """
         Convert a raster to a tsv file
 
@@ -188,7 +176,7 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         :param srcfile: source file
         :param dstfile: destination file
         """
-        dstfile = 'temp.txt'
+        tempFile = 'temp.txt'  # include unique hashcode
         band_nums = range(1, endBand + 1)
         srcwin = None
         if band_nums == []: band_nums = [1]
@@ -213,8 +201,8 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
             srcwin = (0, 0, srcds.RasterXSize, srcds.RasterYSize)
 
         # Open the output file.
-        if dstfile is not None:
-            dst_fh = open(dstfile, 'wt')
+        if tempFile is not None:
+            dst_fh = open(tempFile, 'wt')
         else:
             dst_fh = sys.stdout
         band_format = ("%g " * len(bands)).rstrip() + '\n'
@@ -245,8 +233,7 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
                 band_str = band_format % tuple(x_i_data)
                 line = format % (float(geo_x), float(geo_y), band_str)
                 dst_fh.write(line)
-
-
+        return tempFile
 
     def insertLBL(repository, inputFolder, startBand, endBand):
         """
@@ -343,11 +330,16 @@ def insertRaster(Repository, filename, totalBands, SRID=4326):
         database.conn.commit()
         print('Repository name changed')
 
-    def deleteBandInRepository(repositoryName, bandNumber):
+    def addBandToRepository(self, repositoryName, bandFormula):
+        # Add a column to a table using alter Command
+        return
 
+    def deleteBandInRepository(self, repositoryName, bandNumber):
         # This function will delete the band number attribute from the table.
 
-    def getRaster(repositoryName, rasterFileName, Xmin, Ymin, Xmax=0, Ymax=0, Bands="*"):
+        return
+
+    def getRaster(self, repositoryName, rasterFileName, Xmin, Ymin, Xmax, Ymax, Bands="*"):
         """
         Get a raster image from the database
 
