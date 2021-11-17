@@ -13,10 +13,8 @@ from osgeo import gdal
 
 
 class database:
-    conn = ""
-    cur = ""
 
-    def connect(dbName, hostIP, user, password, port=5432):
+    def connect(self, dbName, hostIP, user, password, port=5432):
         """
         Connect to the database
 
@@ -40,31 +38,30 @@ class database:
         Disconnect from the database
         """
         if database.conn is not None:
-            print("Disconnecting from database")
+            print("Disconnecting from repository")
             database.conn.close()
-            print("Disconnected from database")
+            print("Disconnected from repository")
 
     def testConnection(self):
         """
         Test the connection to the database
         """
 
-        database.conn = None
+        conn = None
         try:
             # read database configuration
             params = config()
             # connect to the PostgreSQL database
-            database.conn = psycopg2.connect(**params)
+            conn = psycopg2.connect(**params)
             # create a new cursor
-            database.curr = database.conn.cursor()
-            database.curr.execute("select version()")
-            for item in database.curr:
+            curr = database.conn.cursor()
+            for item in curr.execute("select version()"):
                 print(item)
             print('You are now connected')
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
 
-    def reConnect(dbName, hostIP, user, password, port=5432):
+    def reConnect(self, dbName, hostIP, user, password, port=5432):
         """
         Edit the connection to the database
 
@@ -74,58 +71,60 @@ class database:
         :param password: password
         :param port: port
         """
-        database.conn = None
+        conn = None
         if dbName != "":
             with open('database.ini', "w") as dbFile:
                 buffer = "[postgresql]\nhost = " + hostIP + "\nport = " + str(
                     port) + "\ndatabase = " + dbName + "\nuser = " + user + "\npassword = " + password
                 dbFile.write(buffer)
                 dbFile.close()
-        database.testDatabaseConnection()
+        self.testConnection()
 
-    def createRepository(repositoryName, totalBands, SRID=4326):
+    def createRepository(self, repositoryName, totalBands, SRID=4326):
         """
         Create a repository in the database
 
         :param repositoryName: name of the repository
         :param totalBands: total number of bands
         :param SRID: spatial reference ID
-        :param coordsFrontOrBack: front or back
         """
-        # total bands is number
-        query = "geog geometry(POINT," + str(SRID) + "),"
-        for i in range(1, totalBands):
-            query += 'b' + str(i) + ' float,'
-        query += 'b' + str(i) + ' float'
-        database.curr.execute("create table " + repositoryName + "(" + query + ")")
-        database.conn.commit()
-        print('Repository created')
+        conn = ""
+        try:
+            # total bands is number
+            query = "geog geometry(POINT," + str(SRID) + "),"
+            for i in range(1, totalBands):
+                query += 'b' + str(i) + ' float,'
+            query += 'b' + str(i) + ' float'
+            database.curr.execute("create table " + repositoryName + "(" + query + ")")
+            database.conn.commit()
+            print('Repository created')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Database connection closed.')
 
     def insertRaster(self, repositoryName, fileName, totalBands, SRID=4326):
         """
         Insert a TIFF file into the database
 
-        :param Repository: name of the Repository
-        :param filename: name of the TIFF file
+        :param repositoryName: name of the Repository
+        :param fileName: name of the TIFF file
         :param totalBands: number of bands
         :param SRID: spatial reference ID
         """
         query = "python3 gdal2xyz.py"
-        tempFile = database.__r2tsv(totalBands, fileName)
+        tempFile = database._r2tsv(totalBands, fileName)
         with open(tempFile) as inFile:
             tempFile2 = "temp2.txt"  # create a randomFileName
             with open(tempFile2, "w") as outFile:
                 for lines in inFile:
-                    word = lines.strip()
-                    word = word.split(" ")
-
-                    new = wkb.dumps(wkt.loads("POINT(" + word[0] + " " + word[1] + ")"), hex=True, srid=SRID)
-
-                    sqlLine = new
-                    for w in word[2:]:
-                        sqlLine += ' ' + w
-                    sqlLine += "\n"
-                    outFile.write(sqlLine)
+                    words = lines.split(' ').strip()
+                    sqlLine = wkb.dumps(wkt.loads("POINT(" + words[0] + " " + words[1] + ")"), hex=True, srid=SRID)
+                    for word in words[2:]:
+                        sqlLine += ' ' + word
+                    outFile.write(sqlLine + '\n')
                 outFile.close()
             inFile.close()
 
@@ -167,7 +166,7 @@ class database:
             if os.path.exists("temp_" + filename):
                 os.remove("temp_" + filename)
 
-    def __r2tsv(self, endBand, srcfile):
+    def _r2tsv(self, endBand, srcfile):
         """
         Convert a raster to a tsv file
 
@@ -181,7 +180,7 @@ class database:
         srcwin = None
         if band_nums == []: band_nums = [1]
 
-        # Open source file. 
+        # Open source file.
         srcds = gdal.Open(srcfile)
         if srcds is None:
             print('Could not open %s.' % srcfile)
@@ -231,71 +230,71 @@ class database:
                 for i in range(len(bands)):
                     x_i_data.append(data[i][x_i])
                 band_str = band_format % tuple(x_i_data)
-                line = format % (float(geo_x), float(geo_y), band_str)
+                line = format % (float(geo_x), float(geo_y), band_str)  # Convert X and Y in hex, store the data, and upload
                 dst_fh.write(line)
         return tempFile
 
-    def insertLBL(repository, inputFolder, startBand, endBand):
-        """
-        Insert a LBL file into the database
+    # def insertLBL(self, repository, inputFolder, startBand, endBand):
+    #     """
+    #     Insert a LBL file into the database
+    #
+    #     :param repository: name of the repository
+    #     :param inputFolder: folder containing the LBL files
+    #     :param startBand: start band
+    #     :param endBand: end band
+    #     """
+    #     fileExtension = "lbl"
+    #     outputFolder = ''
+    #     path = inputFolder + '/*.' + fileExtension
+    #     # reading each file in a folder
+    #     my_df = pd.DataFrame()
+    #     file = glob.glob(path)
+    #     listOfDataframes = []
+    #     mainDataFrame = pd.DataFrame()
+    #     out_csv = ('rawData.tsv')
+    #     text = ''
+    #     header = ['0']
+    #     for bandNo in range(startBand, endBand + 1):
+    #         text = text + '-band ' + str(bandNo) + ' '
+    #         header.append('-band' + str(bandNo))
+    #
+    #     if os.path.exists(out_csv):
+    #         os.remove(out_csv)
+    #
+    #     for file in glob.glob(path):
+    #         # extracting output filename
+    #         parameters = text + file + ' ' + out_csv
+    #         raster2tsv.raster2tsv(parameters)
+    #         mainDataFrame = pd.read_csv(out_csv, header=None, sep='\t')
+    #         mainDataFrame.columns = header
+    #     # mainDataFrame = mainDataFrame.set_index('coordinate')
+    #     mainDataFrame.to_csv('rawData.tsv', index=False, header=False, sep='\t')
+    #
+    #     with open("rawData.tsv") as inFile:
+    #         with open("rawData2.tsv", "w") as outFile:
+    #             for lines in inFile:
+    #                 word = lines.strip()
+    #                 word = word.split("\t")
+    #
+    #                 buffer = word[0]
+    #                 p = wkt.loads(buffer)
+    #                 new = wkb.dumps(p, hex=True, srid=4326)
+    #
+    #                 sqlLine = new
+    #                 for w in word[1:]:
+    #                     sqlLine += ' ' + w
+    #                 sqlLine += "\n"
+    #                 outFile.write(sqlLine)
+    #             outFile.close()
+    #         inFile.close()
+    #
+    #     database.insertCSVFile("rawData2.tsv", ' ', repository)
+    #     if os.path.exists("rawData.tsv"):
+    #         os.remove("rawData.tsv")
+    #     if os.path.exists("rawData2.tsv"):
+    #         os.remove("rawData2.tsv")
 
-        :param repository: name of the repository
-        :param inputFolder: folder containing the LBL files
-        :param startBand: start band
-        :param endBand: end band
-        """
-        fileExtension = "lbl"
-        outputFolder = ''
-        path = inputFolder + '/*.' + fileExtension
-        # reading each file in a folder
-        my_df = pd.DataFrame()
-        file = glob.glob(path)
-        listOfDataframes = []
-        mainDataFrame = pd.DataFrame()
-        out_csv = ('rawData.tsv')
-        text = ''
-        header = ['0']
-        for bandNo in range(startBand, endBand + 1):
-            text = text + '-band ' + str(bandNo) + ' '
-            header.append('-band' + str(bandNo))
-
-        if os.path.exists(out_csv):
-            os.remove(out_csv)
-
-        for file in glob.glob(path):
-            # extracting output filename
-            parameters = text + file + ' ' + out_csv
-            raster2tsv.raster2tsv(parameters)
-            mainDataFrame = pd.read_csv(out_csv, header=None, sep='\t')
-            mainDataFrame.columns = header
-        # mainDataFrame = mainDataFrame.set_index('coordinate')
-        mainDataFrame.to_csv('rawData.tsv', index=False, header=False, sep='\t')
-
-        with open("rawData.tsv") as inFile:
-            with open("rawData2.tsv", "w") as outFile:
-                for lines in inFile:
-                    word = lines.strip()
-                    word = word.split("\t")
-
-                    buffer = word[0]
-                    p = wkt.loads(buffer)
-                    new = wkb.dumps(p, hex=True, srid=4326)
-
-                    sqlLine = new
-                    for w in word[1:]:
-                        sqlLine += ' ' + w
-                    sqlLine += "\n"
-                    outFile.write(sqlLine)
-                outFile.close()
-            inFile.close()
-
-        database.insertCSVFile("rawData2.tsv", ' ', repository)
-        if os.path.exists("rawData.tsv"):
-            os.remove("rawData.tsv")
-        if os.path.exists("rawData2.tsv"):
-            os.remove("rawData2.tsv")
-
-    def deleteRepository(repositoryName):
+    def deleteRepository(self, repositoryName):
         """
         Delete a repository from the database
 
@@ -304,9 +303,9 @@ class database:
         deleteRepository = "drop table " + repositoryName + ";"
         database.curr.execute(deleteRepository)
         database.conn.commit()
-        print('Repository deleted')
+        print( repositoryName + ' deleted successfully')
 
-    def cloneRepository(repositoryName, cloneRepositoryName):
+    def cloneRepository(self, repositoryName, cloneRepositoryName):
         """
         Clone a repository from the database
 
@@ -354,10 +353,9 @@ class database:
         # connect to database
         # create geoTIFF file
         # gDal transform to geoTIFF
-        df = database.getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands)
-        database.dataFrame2Raster(df, rasterFileName)
+        database.dataFrame2Raster(database.getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
 
-    def dataFrame2Raster(dataframe, rasterFileName):
+    def dataFrame2Raster(self,dataframe, rasterFileName):
         """
         Create a raster image from a dataframe
 
@@ -401,7 +399,7 @@ class database:
         buffer = 'rm output*.nc'
         print(subprocess.getstatusoutput(buffer))
 
-    def getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
+    def getDataframeForEnvelope(self, repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a given envelope
 
@@ -426,7 +424,7 @@ class database:
         print('dataframe created')
         return dataFrameEnvelope
 
-    def KNN(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
+    def kNearestPixels(self, repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a point and its neighbors
 
@@ -446,7 +444,7 @@ class database:
         print('dataframe created')
         return dataFrameKNN
 
-    def getRasterImageKNN(repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
+    def getRasterImageKNN(self,repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
         """
         Get a raster image from the database for a point and its neighbors
 
