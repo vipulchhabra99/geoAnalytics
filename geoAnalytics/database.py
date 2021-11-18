@@ -1,20 +1,32 @@
-from geoAnalytics.config import config
-from geoAnalytics import csv2raster as c2r
+# from geoAnalytics import csv2raster as c2r
+# from geoAnalytics.config import config
+# from shapely import geos, wkb, wkt
+# from osgeo import gdal
+# import numpy as Numeric
+# import pandas as pd
+# import subprocess
+# import psycopg2
+# import random
+# import glob
+# import sys
+# import os
+
+import csv2raster as c2r
+from config import config
 from shapely import geos, wkb, wkt
-import psycopg2
-import pandas as pd
-import os
-import subprocess
-import glob
-from geoAnalytics import raster2tsv
-import sys
-import numpy as Numeric
 from osgeo import gdal
+import numpy as Numeric
+import pandas as pd
+import subprocess
+import psycopg2
+import random
+import sys
+import os
 
 
 class database:
 
-    def connect(self, dbName, hostIP, user, password, port=5432):
+    def connect(self, dbName="", hostIP="", user="", password="", port=5432):
         """
         Connect to the database
 
@@ -24,22 +36,28 @@ class database:
         :param password: password
         :param port: port
         """
-        database.conn = None
+
         if dbName != "":
             with open('database.ini', "w") as dbFile:
-                buffer = "[postgresql]\nhost = " + hostIP + "\nport = " + str(
-                    port) + "\ndatabase = " + dbName + "\nuser = " + user + "\npassword = " + password
-                dbFile.write(buffer)
+                dbFile.write("[postgresql]\nhost = " + str(hostIP) + "\nport = " + str(port) +
+                             "\ndatabase = " + str(dbName) + "\nuser = " + str(user) + "\npassword = " + str(password))
                 dbFile.close()
-        database.testDatabaseConnection()
+        connection = database.testConnection(self)
 
     def disconnect(self):
         """
         Disconnect from the database
         """
-        if database.conn is not None:
+        conn = None
+        # read database configuration
+        params = config()
+        # connect to the PostgreSQL database
+        conn = psycopg2.connect(**params)
+        # create a new cursor
+        curr = conn.cursor()
+        if conn is not None:
             print("Disconnecting from repository")
-            database.conn.close()
+            conn.close()
             print("Disconnected from repository")
 
     def testConnection(self):
@@ -47,21 +65,22 @@ class database:
         Test the connection to the database
         """
 
-        conn = None
         try:
+            conn = None
             # read database configuration
             params = config()
             # connect to the PostgreSQL database
             conn = psycopg2.connect(**params)
             # create a new cursor
-            curr = database.conn.cursor()
-            for item in curr.execute("select version()"):
+            curr = conn.cursor()
+            curr.execute("select version();")
+            for item in curr:
                 print(item)
             print('You are now connected')
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
 
-    def reConnect(self, dbName, hostIP, user, password, port=5432):
+    def reConnect(self, dbName="", hostIP="", user="", password="", port=5432):
         """
         Edit the connection to the database
 
@@ -88,24 +107,31 @@ class database:
         :param totalBands: total number of bands
         :param SRID: spatial reference ID
         """
-        conn = ""
+
         try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
             # total bands is number
             query = "geog geometry(POINT," + str(SRID) + "),"
             for i in range(1, totalBands):
                 query += 'b' + str(i) + ' float,'
-            query += 'b' + str(i) + ' float'
-            database.curr.execute("create table " + repositoryName + "(" + query + ")")
-            database.conn.commit()
+            query += 'b' + str(totalBands) + ' float'
+            curr.execute("create table " + repositoryName + "(" + query + ")")
+            conn.commit()
             print('Repository created')
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
         finally:
             if conn is not None:
                 conn.close()
-                print('Database connection closed.')
+                print('Repository connection closed.')
 
-    def insertRaster(self, repositoryName, fileName, totalBands, SRID=4326):
+    def insertRaster(self, repositoryName, fileName, totalBands, scalingFactor, SRID=4326):
         """
         Insert a TIFF file into the database
 
@@ -113,60 +139,43 @@ class database:
         :param fileName: name of the TIFF file
         :param totalBands: number of bands
         :param SRID: spatial reference ID
+        :param scalingFactor: scaling factor
         """
-        query = "python3 gdal2xyz.py"
-        tempFile = database._r2tsv(totalBands, fileName)
-        with open(tempFile) as inFile:
-            tempFile2 = "temp2.txt"  # create a randomFileName
-            with open(tempFile2, "w") as outFile:
-                for lines in inFile:
-                    words = lines.split(' ').strip()
-                    sqlLine = wkb.dumps(wkt.loads("POINT(" + words[0] + " " + words[1] + ")"), hex=True, srid=SRID)
-                    for word in words[2:]:
-                        sqlLine += ' ' + word
-                    outFile.write(sqlLine + '\n')
-                outFile.close()
-            inFile.close()
-
-        database.insertCSVFile(tempFile2, repositoryName)
+        tempFile = self._r2tsv(totalBands, fileName, scalingFactor, SRID)
+        database.insertCSV(tempFile, repositoryName)
         if os.path.exists(tempFile):
             os.remove(tempFile)
-        if os.path.exists(tempFile2):
-            os.remove(tempFile2)
 
-        def insertCSV(filename, repositoryName, seperator=' '):
-            """
-            Insert a CSV file into the database
+    def insertCSV(filename, repositoryName, seperator=' '):
+        """
+        Insert a CSV file into the database
 
-            :param filename: name of the CSV file
-            :param repositoryName: name of the Repository
-            :param seperator: seperator
-            """
-            with open(filename) as inFile:
-                with open("temp_" + filename, "w") as tempFile:
-                    for lines in inFile:
-                        word = lines.strip()
-                        word = word.split(seperator)
-                        sqlLine = ""
-                        for w in word:
-                            sqlLine += w + " "
-                        sqlLine = sqlLine[:-1] + "\n"
-                        tempFile.write(sqlLine)
-                    tempFile.close()
-                inFile.close()
+        :param filename: name of the CSV file
+        :param repositoryName: name of the Repository
+        :param seperator: seperator
+        """
 
-            copy_file = "copy " + repositoryName + " from '" + str(
-                os.getcwd()) + "/temp_" + filename + "' delimiters '" + ' ' + "' csv;"
-            database.curr.execute(copy_file)
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            buffer = "COPY " + str(repositoryName) + " FROM '" + str(os.getcwd()) + '/' + str(
+                filename) + "' DELIMITER '" + str(seperator) + "' CSV;"
+            curr.execute(buffer)
+            conn.commit()
+            print('File inserted')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
 
-            # finished
-            database.conn.commit()
-            print('file has been inserted')
-
-            if os.path.exists("temp_" + filename):
-                os.remove("temp_" + filename)
-
-    def _r2tsv(self, endBand, srcfile):
+    def _r2tsv(self, endBand, srcfile, scalingFactor, SRID):
         """
         Convert a raster to a tsv file
 
@@ -174,11 +183,14 @@ class database:
         :param endBand: end band
         :param srcfile: source file
         :param dstfile: destination file
+        :param scalingFactor: scaling factor
         """
-        tempFile = 'temp.txt'  # include unique hashcode
+
+        tempFile = str(random.randint(0, 100000)) + ".txt"
         band_nums = range(1, endBand + 1)
         srcwin = None
-        if band_nums == []: band_nums = [1]
+        if band_nums == []:
+            band_nums = [1]
 
         # Open source file.
         srcds = gdal.Open(srcfile)
@@ -210,9 +222,9 @@ class database:
         if abs(gt[0]) < 180 and abs(gt[3]) < 180 \
                 and abs(srcds.RasterXSize * gt[1]) < 180 \
                 and abs(srcds.RasterYSize * gt[5]) < 180:
-            format = '%.10g %.10g %s'
+            format = '%s %s'
         else:
-            format = '%.3f %.3f %s'
+            format = '%s %s'
 
         # Loop emitting data.
         for y in range(srcwin[1], srcwin[1] + srcwin[3]):
@@ -228,71 +240,12 @@ class database:
                 geo_y = gt[3] + (x + 0.5) * gt[4] + (y + 0.5) * gt[5]
                 x_i_data = []
                 for i in range(len(bands)):
-                    x_i_data.append(data[i][x_i])
+                    x_i_data.append(data[i][x_i]*scalingFactor)
                 band_str = band_format % tuple(x_i_data)
-                line = format % (float(geo_x), float(geo_y), band_str)  # Convert X and Y in hex, store the data, and upload
+                line = format % (wkb.dumps(wkt.loads("POINT(" + str(float(geo_x)) + " " + str(float(geo_y)) + ")"),
+                                 hex=True, srid=SRID), band_str)  # Convert X and Y in hex, store the data, and upload
                 dst_fh.write(line)
         return tempFile
-
-    # def insertLBL(self, repository, inputFolder, startBand, endBand):
-    #     """
-    #     Insert a LBL file into the database
-    #
-    #     :param repository: name of the repository
-    #     :param inputFolder: folder containing the LBL files
-    #     :param startBand: start band
-    #     :param endBand: end band
-    #     """
-    #     fileExtension = "lbl"
-    #     outputFolder = ''
-    #     path = inputFolder + '/*.' + fileExtension
-    #     # reading each file in a folder
-    #     my_df = pd.DataFrame()
-    #     file = glob.glob(path)
-    #     listOfDataframes = []
-    #     mainDataFrame = pd.DataFrame()
-    #     out_csv = ('rawData.tsv')
-    #     text = ''
-    #     header = ['0']
-    #     for bandNo in range(startBand, endBand + 1):
-    #         text = text + '-band ' + str(bandNo) + ' '
-    #         header.append('-band' + str(bandNo))
-    #
-    #     if os.path.exists(out_csv):
-    #         os.remove(out_csv)
-    #
-    #     for file in glob.glob(path):
-    #         # extracting output filename
-    #         parameters = text + file + ' ' + out_csv
-    #         raster2tsv.raster2tsv(parameters)
-    #         mainDataFrame = pd.read_csv(out_csv, header=None, sep='\t')
-    #         mainDataFrame.columns = header
-    #     # mainDataFrame = mainDataFrame.set_index('coordinate')
-    #     mainDataFrame.to_csv('rawData.tsv', index=False, header=False, sep='\t')
-    #
-    #     with open("rawData.tsv") as inFile:
-    #         with open("rawData2.tsv", "w") as outFile:
-    #             for lines in inFile:
-    #                 word = lines.strip()
-    #                 word = word.split("\t")
-    #
-    #                 buffer = word[0]
-    #                 p = wkt.loads(buffer)
-    #                 new = wkb.dumps(p, hex=True, srid=4326)
-    #
-    #                 sqlLine = new
-    #                 for w in word[1:]:
-    #                     sqlLine += ' ' + w
-    #                 sqlLine += "\n"
-    #                 outFile.write(sqlLine)
-    #             outFile.close()
-    #         inFile.close()
-    #
-    #     database.insertCSVFile("rawData2.tsv", ' ', repository)
-    #     if os.path.exists("rawData.tsv"):
-    #         os.remove("rawData.tsv")
-    #     if os.path.exists("rawData2.tsv"):
-    #         os.remove("rawData2.tsv")
 
     def deleteRepository(self, repositoryName):
         """
@@ -300,10 +253,24 @@ class database:
 
         :param repositoryName: name of the repository
         """
-        deleteRepository = "drop table " + repositoryName + ";"
-        database.curr.execute(deleteRepository)
-        database.conn.commit()
-        print( repositoryName + ' deleted successfully')
+
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("drop table " + repositoryName + ";")
+            conn.commit()
+            print(repositoryName + ' deleted successfully')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
 
     def cloneRepository(self, repositoryName, cloneRepositoryName):
         """
@@ -312,29 +279,94 @@ class database:
         :param repositoryName: name of the repository
         :param cloneRepositoryName: name of the cloned repository
         """
-        cloneRepository = "create table " + cloneRepositoryName + " as (select * from " + repositoryName + ");"
-        database.curr.execute(cloneRepository)
-        database.conn.commit()
-        print('Repository cloned')
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("create table " + cloneRepositoryName +
+                         " as (select * from " + repositoryName + ");")
+            conn.commit()
+            print('Repository cloned')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
 
-    def changeRepositoryName(repositoryName, newRepositoryName):
+    def changeRepositoryName(self,repositoryName, newRepositoryName):
         """
         Change the name of a repository in the database
-        
+
         :param repositoryName: name of the repository
         :param newRepositoryName: new name of the repository
         """
-        changeRepositoryName = "ALTER TABLE IF EXISTS " + repositoryName + " RENAME TO " + newRepositoryName + ";"
-        database.curr.execute(changeRepositoryName)
-        database.conn.commit()
-        print('Repository name changed')
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("ALTER TABLE IF EXISTS " +
+                         repositoryName + " RENAME TO " + newRepositoryName + ";")
+            conn.commit()
+            print(repositoryName + ' changed to ' + newRepositoryName)
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
 
-    def addBandToRepository(self, repositoryName, bandFormula):
-        # Add a column to a table using alter Command
-        return
+    # def addBandToRepository(self, repositoryName, bandFormula):
+    #     # Add a column to a table using alter Command
+    #     try:
+    #         conn = None
+    #         # read database configuration
+    #         params = config()
+    #         # connect to the PostgreSQL database
+    #         conn = psycopg2.connect(**params)
+    #         # create a new cursor
+    #         curr = conn.cursor()
+    #         # describe table command
+            
+    #         curr.execute("ALTER TABLE " + repositoryName + " ADD COLUMN B" +
+    #                      str(bandNumber) + " float" + ";")
+    #         conn.commit()
+    #         print('Band added to repository')
+    #     except (Exception, psycopg2.DatabaseError) as error:
+    #         print(error)
+    #     finally:
+    #         if conn is not None:
+    #             conn.close()
+    #             print('Repository connection closed.')
 
     def deleteBandInRepository(self, repositoryName, bandNumber):
         # This function will delete the band number attribute from the table.
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("ALTER TABLE " + repositoryName + " DROP COLUMN B" +
+                         str(bandNumber) + ";")
+            conn.commit()
+            print('Band deleted from repository')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
 
         return
 
@@ -353,9 +385,10 @@ class database:
         # connect to database
         # create geoTIFF file
         # gDal transform to geoTIFF
-        database.dataFrame2Raster(database.getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
+        print('Getting raster from database')
+        database.dataFrame2Raster(database.getDataframeForEnvelope(self, repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
 
-    def dataFrame2Raster(self,dataframe, rasterFileName):
+    def dataFrame2Raster(dataframe, rasterFileName):
         """
         Create a raster image from a dataframe
 
@@ -363,41 +396,11 @@ class database:
         :param rasterFileName: name of the raster file with no file extension.
 
         """
-
-        # check rasterFile type
-        gobi = rasterFileName[-3:]
-        extension = '.tif'
+        print('Creating raster file')
 
         df = dataframe
-        df = df.sort_values(['y', 'x'], ascending=[True, True])
-        df = df.reset_index()
-        df = df.drop(columns=["index"])
-        dblen = len(df.columns) - 1
-        for i in range(1, len(df.columns) - 1, 1):
-            obj4 = c2r.csv2raster(output_file='output' + str(i) + '.nc', dataframe=df)
-            obj4.toraster()
-            columnDrop = 'b' + str(i)
-            df = df.drop(columns=columnDrop)
-        for i in range(1, dblen):
-            colN = 'Band1,b' + str(i)
-            file = 'output' + str(i) + '.nc'
-            subprocess.check_call(['ncrename', '-v', colN, file])
-
-        if rasterFileName[-3:] == '.nc':
-            buffer = 'cdo cat output*.nc ' + rasterFileName
-            print(subprocess.getstatusoutput(buffer))
-        elif rasterFileName[-3:] == 'iff' or rasterFileName[-3:] == 'tif':
-            buffer = 'cdo cat output*.nc combined.nc'
-            print(subprocess.getstatusoutput(buffer))
-            buffer = 'gdal_translate -of GTiff combined.nc ' + rasterFileName
-            print(rasterFileName)
-            print(subprocess.getstatusoutput(buffer))
-            buffer = 'rm combined.nc'
-            print(subprocess.getstatusoutput(buffer))
-
-        print('raster generated')
-        buffer = 'rm output*.nc'
-        print(subprocess.getstatusoutput(buffer))
+        raster = c2r.Csv2raster(df)
+        raster.save_raster_image(rasterFileName)
 
     def getDataframeForEnvelope(self, repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
         """
@@ -415,14 +418,26 @@ class database:
         # connect to database
         # create geoTIFF file
         # gDal transform to geoTIFF
+        print('Getting dataframe from database')
 
-        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + repositoryName + " WHERE " + repositoryName + ".geog && ST_MakeEnvelope(" + str(
-            Xmin) + ',' + str(Ymin) + ',' + str(Xmax) + ',' + str(Ymax) + ");"
-        dataFrameEnvelope = pd.read_sql_query(query, database.conn)
-        if Bands == "*":
-            dataFrameEnvelope = dataFrameEnvelope.drop(columns=["geog"])
-        print('dataframe created')
-        return dataFrameEnvelope
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) + " WHERE " + str(repositoryName) + ".geog && ST_MakeEnvelope(" + str(Xmin) + ',' + str(Ymin) + ',' + str(Xmax) + ',' + str(Ymax) + ");"
+            dataFrameEnvelope = pd.read_sql_query(query, conn)
+            print('Dataframe created')
+            if Bands == "*":
+                dataFrameEnvelope = dataFrameEnvelope.drop(columns=["geog"])
+            return dataFrameEnvelope
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
 
     def kNearestPixels(self, repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
         """
@@ -435,16 +450,18 @@ class database:
         :param Bands: bands to be extracted
         :param SRID: spatial reference ID
         """
-        query = "SELECT ST_X(geom::geometry) as x, ST_Y(geom::geometry) as y, " + str(Bands) + " FROM " + str(
-            repositoryName) + " ORDER BY " + str(repositoryName) + ".geom <-> 'SRID=" + str(SRID) + ";POINT(" + str(
-            X) + ' ' + str(Y) + ")'::geometry limit " + str(k) + ";"
+        print('Getting dataframe from database')
+
+        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + str(Bands) + " FROM " + str(
+            repositoryName) + " ORDER BY " + str(repositoryName) + ".geog <-> 'SRID=" + str(SRID) + ";POINT(" + str(
+            X) + ' ' + str(Y) + ")'::geog limit " + str(k) + ";"
         dataFrameKNN = pd.read_sql_query(query, database.conn)
         if Bands == "*":
-            dataFrameKNN = dataFrameKNN.drop(columns=["geom"])
+            dataFrameKNN = dataFrameKNN.drop(columns=["geog"])
         print('dataframe created')
         return dataFrameKNN
 
-    def getRasterImageKNN(self,repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
+    def getRasterImageKNN(self, repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
         """
         Get a raster image from the database for a point and its neighbors
 
