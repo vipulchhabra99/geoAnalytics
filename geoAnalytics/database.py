@@ -1,18 +1,5 @@
-# from geoAnalytics import csv2raster as c2r
-# from geoAnalytics.config import config
-# from shapely import geos, wkb, wkt
-# from osgeo import gdal
-# import numpy as Numeric
-# import pandas as pd
-# import subprocess
-# import psycopg2
-# import random
-# import glob
-# import sys
-# import os
-
-import csv2raster as c2r
-from config import config
+from geoAnalytics import csv2raster as c2r
+from geoAnalytics.config import config
 from shapely import geos, wkb, wkt
 from osgeo import gdal
 import numpy as Numeric
@@ -20,8 +7,21 @@ import pandas as pd
 import subprocess
 import psycopg2
 import random
+import glob
 import sys
 import os
+
+# import csv2raster as c2r
+# from config import config
+# from shapely import geos, wkb, wkt
+# from osgeo import gdal
+# import numpy as Numeric
+# import pandas as pd
+# import subprocess
+# import psycopg2
+# import random
+# import sys
+# import os
 
 
 class database:
@@ -124,6 +124,7 @@ class database:
                 query += 'b' + str(i) + ' float,'
             query += 'b' + str(totalBands) + ' float'
             curr.execute("create table " + repositoryName + "(" + query + ")")
+            curr.execute("CREATE INDEX index_" + repositoryName + "ON " + repositoryName + "USING GIST (geog)" )
             conn.commit()
             print('Repository created')
         except (Exception, psycopg2.DatabaseError) as error:
@@ -208,6 +209,12 @@ class database:
             if conn is not None:
                 conn.close()
                 print('Repository connection closed.')
+
+    def getRepositorySize(self, respositoryName):
+
+
+        return -1;
+
 
     def insertRaster(self, repositoryName, fileName, totalBands, scalingFactor, SRID=4326):
         """

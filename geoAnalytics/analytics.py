@@ -1,6 +1,6 @@
-import csv2raster as c2r
 import os
 import subprocess
+import psycopg2
 import pandas as pd
 from config import config
 
