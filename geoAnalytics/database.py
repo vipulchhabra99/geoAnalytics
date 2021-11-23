@@ -210,11 +210,6 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def getRepositorySize(self, respositoryName):
-
-
-        return -1;
-
 
     def insertRaster(self, repositoryName, fileName, totalBands, scalingFactor, SRID=4326):
         """
@@ -557,3 +552,53 @@ class database:
         # gDal transform to geoTIFF
         df = database.kNearestPixels(repositoryName, X, Y, k, Bands)
         database.dataFrame2Raster(df, rasterFileName)
+
+    def getRepositorySize(self, tableName):
+        """
+        
+        """
+
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            query = "SELECT pg_size_pretty( pg_total_relation_size('" + tableName + "') );"
+            dataFrameEnvelope = pd.read_sql_query(query, conn)
+            print(dataFrameEnvelope.iloc[0]['pg_size_pretty'])
+            return dataFrameEnvelope.iloc[0]['pg_size_pretty']
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
+    
+    
+    def getSizeOfAllRepositories(self):
+        """
+        Get return the size of the repository/database/table
+
+        :param repositoryName: name of the repository
+        """
+
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            q1 = "select current_database();"
+            q2 = pd.read_sql_query(q1, conn)
+
+            query = " SELECT pg_size_pretty( pg_database_size('" + q2.iloc[0]['current_database'] + "') );"
+            dataFrameEnvelope = pd.read_sql_query(query, conn)
+            print(dataFrameEnvelope.iloc[0]['pg_size_pretty'])
+            return dataFrameEnvelope.iloc[0]['pg_size_pretty']
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
