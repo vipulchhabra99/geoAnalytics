@@ -60,6 +60,25 @@ class database:
             conn.close()
             print("Disconnected from repository")
 
+    # def reConnect(self, dbName="", hostIP="", user="", password="", port=5432):
+    #     """
+    #     Edit the connection to the database
+    #
+    #     :param dbName: name of the database
+    #     :param hostIP: host IP
+    #     :param user: user name
+    #     :param password: password
+    #     :param port: port
+    #     """
+    #     conn = None
+    #     if dbName != "":
+    #         with open('database.ini', "w") as dbFile:
+    #             buffer = "[postgresql]\nhost = " + hostIP + "\nport = " + str(
+    #                 port) + "\ndatabase = " + dbName + "\nuser = " + user + "\npassword = " + password
+    #             dbFile.write(buffer)
+    #             dbFile.close()
+    #     self.testConnection()
+
     def testConnection(self):
         """
         Test the connection to the database
@@ -80,24 +99,7 @@ class database:
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
 
-    def reConnect(self, dbName="", hostIP="", user="", password="", port=5432):
-        """
-        Edit the connection to the database
 
-        :param dbName: name of the database
-        :param hostIP: host IP
-        :param user: user name
-        :param password: password
-        :param port: port
-        """
-        conn = None
-        if dbName != "":
-            with open('database.ini', "w") as dbFile:
-                buffer = "[postgresql]\nhost = " + hostIP + "\nport = " + str(
-                    port) + "\ndatabase = " + dbName + "\nuser = " + user + "\npassword = " + password
-                dbFile.write(buffer)
-                dbFile.close()
-        self.testConnection()
 
     def createRepository(self, repositoryName, totalBands, SRID=4326):
         """
@@ -124,6 +126,82 @@ class database:
             curr.execute("create table " + repositoryName + "(" + query + ")")
             conn.commit()
             print('Repository created')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
+    def deleteRepository(self, repositoryName):
+        """
+        Delete a repository from the database
+
+        :param repositoryName: name of the repository
+        """
+
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("drop table " + repositoryName + ";")
+            conn.commit()
+            print(repositoryName + ' deleted successfully')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
+
+    def cloneRepository(self, repositoryName, cloneRepositoryName):
+        """
+        Clone a repository from the database
+
+        :param repositoryName: name of the repository
+        :param cloneRepositoryName: name of the cloned repository
+        """
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("create table " + cloneRepositoryName +
+                         " as (select * from " + repositoryName + ");")
+            conn.commit()
+            print('Repository cloned')
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
+
+    def renameRepository(self,repositoryName, newRepositoryName):
+        """
+        Change the name of a repository in the database
+
+        :param repositoryName: name of the repository
+        :param newRepositoryName: new name of the repository
+        """
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            # create a new cursor
+            curr = conn.cursor()
+            curr.execute("ALTER TABLE IF EXISTS " +
+                         repositoryName + " RENAME TO " + newRepositoryName + ";")
+            conn.commit()
+            print(repositoryName + ' changed to ' + newRepositoryName)
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
         finally:
@@ -247,82 +325,7 @@ class database:
                 dst_fh.write(line)
         return tempFile
 
-    def deleteRepository(self, repositoryName):
-        """
-        Delete a repository from the database
 
-        :param repositoryName: name of the repository
-        """
-
-        try:
-            conn = None
-            # read database configuration
-            params = config()
-            # connect to the PostgreSQL database
-            conn = psycopg2.connect(**params)
-            # create a new cursor
-            curr = conn.cursor()
-            curr.execute("drop table " + repositoryName + ";")
-            conn.commit()
-            print(repositoryName + ' deleted successfully')
-        except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
-        finally:
-            if conn is not None:
-                conn.close()
-                print('Repository connection closed.')
-
-    def cloneRepository(self, repositoryName, cloneRepositoryName):
-        """
-        Clone a repository from the database
-
-        :param repositoryName: name of the repository
-        :param cloneRepositoryName: name of the cloned repository
-        """
-        try:
-            conn = None
-            # read database configuration
-            params = config()
-            # connect to the PostgreSQL database
-            conn = psycopg2.connect(**params)
-            # create a new cursor
-            curr = conn.cursor()
-            curr.execute("create table " + cloneRepositoryName +
-                         " as (select * from " + repositoryName + ");")
-            conn.commit()
-            print('Repository cloned')
-        except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
-        finally:
-            if conn is not None:
-                conn.close()
-                print('Repository connection closed.')
-
-    def changeRepositoryName(self,repositoryName, newRepositoryName):
-        """
-        Change the name of a repository in the database
-
-        :param repositoryName: name of the repository
-        :param newRepositoryName: new name of the repository
-        """
-        try:
-            conn = None
-            # read database configuration
-            params = config()
-            # connect to the PostgreSQL database
-            conn = psycopg2.connect(**params)
-            # create a new cursor
-            curr = conn.cursor()
-            curr.execute("ALTER TABLE IF EXISTS " +
-                         repositoryName + " RENAME TO " + newRepositoryName + ";")
-            conn.commit()
-            print(repositoryName + ' changed to ' + newRepositoryName)
-        except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
-        finally:
-            if conn is not None:
-                conn.close()
-                print('Repository connection closed.')
 
     # def addBandToRepository(self, repositoryName, bandFormula):
     #     # Add a column to a table using alter Command
@@ -402,6 +405,76 @@ class database:
         raster = c2r.Csv2raster(df)
         raster.save_raster_image(rasterFileName)
 
+    def getDataframe(self, repositoryName, Bands="*", SRID=4326):
+        """
+        Get a dataframe from the database for a given envelope
+
+        :param repositoryName: name of the repository
+        :param Xmin: minimum X coordinate
+        :param Ymin: minimum Y coordinate
+        :param Xmax: maximum X coordinate
+        :param Ymax: maximum Y coordinate
+        :param Bands: bands to be extracted
+        :param SRID: spatial reference ID
+        """
+
+        # connect to database
+        # create geoTIFF file
+        # gDal transform to geoTIFF
+        print('Getting dataframe from database')
+
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) + ";"
+            dataFrameEnvelope = pd.read_sql_query(query, conn)
+            print('Dataframe created')
+            if Bands == "*":
+                dataFrameEnvelope = dataFrameEnvelope.drop(columns=["geog"])
+            return dataFrameEnvelope
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
+
+    def getDataframe(self, repositoryName,Bands="*", SRID=4326):
+        """
+        Get a dataframe from the database for a given envelope
+
+        :param repositoryName: name of the repository
+        :param Bands: bands to be extracted
+        :param SRID: spatial reference ID
+        """
+
+        # connect to database
+        # create geoTIFF file
+        # gDal transform to geoTIFF
+        print('Getting dataframe from database')
+
+        try:
+            conn = None
+            # read database configuration
+            params = config()
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**params)
+            query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) +";"
+            dataFrameEnvelope = pd.read_sql_query(query, conn)
+            print('Dataframe created')
+            if Bands == "*":
+                dataFrameEnvelope = dataFrameEnvelope.drop(columns=["geog"])
+            return dataFrameEnvelope
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+                print('Repository connection closed.')
+
     def getDataframeForEnvelope(self, repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a given envelope
@@ -461,7 +534,7 @@ class database:
         print('dataframe created')
         return dataFrameKNN
 
-    def getRasterImageKNN(self, repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
+    def getRasterForkNearestPixels(self, repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
         """
         Get a raster image from the database for a point and its neighbors
 
@@ -475,5 +548,5 @@ class database:
         # connect to database
         # create geoTIFF file
         # gDal transform to geoTIFF
-        df = database.KNN(repositoryName, X, Y, k, Bands)
+        df = database.kNearestPixels(repositoryName, X, Y, k, Bands)
         database.dataFrame2Raster(df, rasterFileName)
