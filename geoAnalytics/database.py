@@ -26,7 +26,7 @@ import os
 
 class database:
 
-    def connect(self, dbName="", hostIP="", user="", password="", port=5432):
+    def connect(dbName="", hostIP="", user="", password="", port=5432):
         """
         Connect to the database
 
@@ -42,9 +42,9 @@ class database:
                 dbFile.write("[postgresql]\nhost = " + str(hostIP) + "\nport = " + str(port) +
                              "\ndatabase = " + str(dbName) + "\nuser = " + str(user) + "\npassword = " + str(password))
                 dbFile.close()
-        connection = database.testConnection(self)
+        connection = database.testConnection()
 
-    def disconnect(self):
+    def disconnect():
         """
         Disconnect from the database
         """
@@ -79,7 +79,7 @@ class database:
     #             dbFile.close()
     #     self.testConnection()
 
-    def testConnection(self):
+    def testConnection():
         """
         Test the connection to the database
         """
@@ -101,7 +101,7 @@ class database:
 
 
 
-    def createRepository(self, repositoryName, totalBands, SRID=4326):
+    def createRepository(repositoryName, totalBands, SRID=4326):
         """
         Create a repository in the database
 
@@ -133,7 +133,8 @@ class database:
             if conn is not None:
                 conn.close()
                 print('Repository connection closed.')
-    def deleteRepository(self, repositoryName):
+
+    def deleteRepository(repositoryName):
         """
         Delete a repository from the database
 
@@ -158,7 +159,7 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def cloneRepository(self, repositoryName, cloneRepositoryName):
+    def cloneRepository(repositoryName, cloneRepositoryName):
         """
         Clone a repository from the database
 
@@ -184,7 +185,7 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def renameRepository(self,repositoryName, newRepositoryName):
+    def renameRepository(repositoryName, newRepositoryName):
         """
         Change the name of a repository in the database
 
@@ -211,7 +212,7 @@ class database:
                 print('Repository connection closed.')
 
 
-    def insertRaster(self, repositoryName, fileName, totalBands, scalingFactor, SRID=4326):
+    def insertRaster(repositoryName, fileName, totalBands, scalingFactor, SRID=4326):
         """
         Insert a TIFF file into the database
 
@@ -221,7 +222,7 @@ class database:
         :param SRID: spatial reference ID
         :param scalingFactor: scaling factor
         """
-        tempFile = self._r2tsv(totalBands, fileName, scalingFactor, SRID)
+        tempFile = database._r2tsv(totalBands, fileName, scalingFactor, SRID)
         database.insertCSV(tempFile, repositoryName)
         if os.path.exists(tempFile):
             os.remove(tempFile)
@@ -255,7 +256,7 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def _r2tsv(self, endBand, srcfile, scalingFactor, SRID):
+    def _r2tsv(endBand, srcfile, scalingFactor, SRID):
         """
         Convert a raster to a tsv file
 
@@ -352,7 +353,7 @@ class database:
     #             conn.close()
     #             print('Repository connection closed.')
 
-    def deleteBandInRepository(self, repositoryName, bandNumber):
+    def deleteBandInRepository(repositoryName, bandNumber):
         # This function will delete the band number attribute from the table.
         try:
             conn = None
@@ -375,7 +376,7 @@ class database:
 
         return
 
-    def getRaster(self, repositoryName, rasterFileName, Xmin, Ymin, Xmax, Ymax, Bands="*"):
+    def getRaster(repositoryName, rasterFileName, Xmin, Ymin, Xmax, Ymax, Bands="*"):
         """
         Get a raster image from the database
 
@@ -391,7 +392,7 @@ class database:
         # create geoTIFF file
         # gDal transform to geoTIFF
         print('Getting raster from database')
-        database.dataFrame2Raster(database.getDataframeForEnvelope(self, repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
+        database.dataFrame2Raster(database.getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
 
     def dataFrame2Raster(dataframe, rasterFileName):
         """
@@ -407,7 +408,7 @@ class database:
         raster = c2r.Csv2raster(df)
         raster.save_raster_image(rasterFileName)
 
-    def getDataframe(self, repositoryName, Bands="*", SRID=4326):
+    def getDataframe(repositoryName, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a given envelope
 
@@ -444,7 +445,7 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def getDataframe(self, repositoryName,Bands="*", SRID=4326):
+    def getDataframe(repositoryName,Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a given envelope
 
@@ -477,7 +478,7 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def getDataframeForEnvelope(self, repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
+    def getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a given envelope
 
@@ -514,7 +515,7 @@ class database:
                 conn.close()
                 print('Repository connection closed.')
 
-    def kNearestPixels(self, repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
+    def kNearestPixels(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
         """
         Get a dataframe from the database for a point and its neighbors
 
@@ -536,7 +537,7 @@ class database:
         print('dataframe created')
         return dataFrameKNN
 
-    def getRasterForkNearestPixels(self, repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
+    def getRasterForkNearestPixels(repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
         """
         Get a raster image from the database for a point and its neighbors
 
@@ -553,7 +554,7 @@ class database:
         df = database.kNearestPixels(repositoryName, X, Y, k, Bands)
         database.dataFrame2Raster(df, rasterFileName)
 
-    def getRepositorySize(self, tableName):
+    def getRepositorySize(tableName):
         """
         
         """
@@ -576,7 +577,7 @@ class database:
                 print('Repository connection closed.')
     
     
-    def getSizeOfAllRepositories(self):
+    def getSizeOfAllRepositories():
         """
         Get return the size of the repository/database/table
 
