@@ -26,7 +26,7 @@ import os
 
 class database:
 
-    def connect(dbName="", hostIP="", user="", password="", port=5432):
+    def connect(dbName, hostIP, user, password, port=5432):
         """
         Connect to the database
 
