@@ -124,7 +124,7 @@ class database:
                 query += 'b' + str(i) + ' float,'
             query += 'b' + str(totalBands) + ' float'
             curr.execute("create table " + repositoryName + "(" + query + ")")
-            curr.execute("CREATE INDEX index_" + repositoryName + "ON " + repositoryName + "USING GIST (geog)" )
+            curr.execute("CREATE INDEX index_" + repositoryName + "ON " + repositoryName + " USING GIST (geog)" )
             conn.commit()
             print('Repository created')
         except (Exception, psycopg2.DatabaseError) as error:
