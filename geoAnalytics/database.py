@@ -10,7 +10,7 @@ import random
 import glob
 import sys
 import os
-import _thread
+import threading
 
 # import csv2raster
 # from config import config
@@ -23,7 +23,7 @@ import _thread
 # import random
 # import sys
 # import os
-# import _thread
+# import threading
 # import glob
 
 
@@ -44,6 +44,7 @@ def connect(dbName, hostIP, user, password, port=5432):
                          "\ndatabase = " + str(dbName) + "\nuser = " + str(user) + "\npassword = " + str(password))
             dbFile.close()
     connection = testConnection()
+
 
 def disconnect():
     """
@@ -80,6 +81,7 @@ def disconnect():
 #             dbFile.close()
 #     self.testConnection()
 
+
 def testConnection():
     """
     Test the connection to the database
@@ -99,7 +101,6 @@ def testConnection():
         print('You are now connected')
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
-
 
 
 def createRepository(repositoryName, totalBands, SRID=4326):
@@ -125,7 +126,8 @@ def createRepository(repositoryName, totalBands, SRID=4326):
             query += 'b' + str(i) + ' float,'
         query += 'b' + str(totalBands) + ' float'
         curr.execute("create table " + repositoryName + "(" + query + ")")
-        curr.execute("CREATE INDEX index_" + repositoryName + " ON " + repositoryName + " USING GIST (geog)" )
+        curr.execute("CREATE INDEX index_" + repositoryName +
+                     " ON " + repositoryName + " USING GIST (geog)")
         conn.commit()
         print('Repository created')
     except (Exception, psycopg2.DatabaseError) as error:
@@ -134,6 +136,7 @@ def createRepository(repositoryName, totalBands, SRID=4326):
         if conn is not None:
             conn.close()
             print('Repository connection closed.')
+
 
 def deleteRepository(repositoryName):
     """
@@ -160,6 +163,7 @@ def deleteRepository(repositoryName):
             conn.close()
             print('Repository connection closed.')
 
+
 def cloneRepository(repositoryName, cloneRepositoryName):
     """
     Clone a repository from the database
@@ -185,6 +189,7 @@ def cloneRepository(repositoryName, cloneRepositoryName):
         if conn is not None:
             conn.close()
             print('Repository connection closed.')
+
 
 def renameRepository(repositoryName, newRepositoryName):
     """
@@ -225,9 +230,10 @@ def insertRaster(repositoryName, fileName, totalBands, scalingFactor, SRID=4326)
     """
     tempFile = _r2tsv(totalBands, fileName, scalingFactor, SRID)
     insertCSV(tempFile, repositoryName)
-    if os.path.exists(tempFile):
-        os.remove(tempFile)
-        
+    #if os.path.exists(tempFile):
+        #os.remove(tempFile)
+
+
 def insertRasterFolder(repositoryName, folderName, totalBands, scalingFactor, SRID=4326):
     """
     Insert a TIFF file into the database
@@ -242,12 +248,21 @@ def insertRasterFolder(repositoryName, folderName, totalBands, scalingFactor, SR
     for file in os.listdir(folderName):
         if file.endswith(".lbl"):
             files.append(file)
-    
+
     print(files)
 
+    threads = []
+
     for file in files:
-        _thread.start_new_thread(insertRaster,(repositoryName, folderName+file, totalBands, scalingFactor, SRID))
-        
+        t = threading.Thread(target=insertRaster, args=(
+            repositoryName, folderName + '/' + file, totalBands, scalingFactor, SRID))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+
 def insertCSV(filename, repositoryName, seperator=' '):
     """
     Insert a CSV file into the database
@@ -276,6 +291,7 @@ def insertCSV(filename, repositoryName, seperator=' '):
         if conn is not None:
             conn.close()
             print('Repository connection closed.')
+
 
 def _r2tsv(endBand, srcfile, scalingFactor, SRID):
     """
@@ -346,11 +362,10 @@ def _r2tsv(endBand, srcfile, scalingFactor, SRID):
             band_str = band_format % tuple(x_i_data)
             # line = format % (wkb.dumps(wkt.loads("POINT(" + str(float(geo_x)) + " " + str(float(geo_y)) + ")"),
             #                  hex=True, srid=SRID), band_str)  # Convert X and Y in hex, store the data, and upload
-            line = format % (wkb.dumps(wkt.loads("POINT(" + str(round(geo_x,4)) + " " + str(round(geo_y,4)) + ")"),
+            line = format % (wkb.dumps(wkt.loads("POINT(" + str(round(geo_x, 4)) + " " + str(round(geo_y, 4)) + ")"),
                              hex=True, srid=SRID), band_str)  # Convert X and Y in hex, store the data, and upload
             dst_fh.write(line)
     return tempFile
-
 
 
 # def addBandToRepository(self, repositoryName, bandFormula):
@@ -399,6 +414,7 @@ def deleteBandInRepository(repositoryName, bandNumber):
 
     return
 
+
 def getRaster(repositoryName, rasterFileName, Xmin, Ymin, Xmax, Ymax, Bands="*"):
     """
     Get a raster image from the database
@@ -415,7 +431,9 @@ def getRaster(repositoryName, rasterFileName, Xmin, Ymin, Xmax, Ymax, Bands="*")
     # create geoTIFF file
     # gDal transform to geoTIFF
     print('Getting raster from database')
-    dataFrame2Raster(getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
+    dataFrame2Raster(getDataframeForEnvelope(
+        repositoryName, Xmin, Ymin, Xmax, Ymax, Bands), rasterFileName)
+
 
 def dataFrame2Raster(dataframe, rasterFileName):
     """
@@ -428,7 +446,8 @@ def dataFrame2Raster(dataframe, rasterFileName):
     print('Creating raster file')
 
     df = dataframe
-    csv2raster.csv2raster(output_file=rasterFileName,dataframe=df)
+    csv2raster.csv2raster(output_file=rasterFileName, dataframe=df)
+
 
 def getDataframe(repositoryName, Bands="*", SRID=4326):
     """
@@ -454,7 +473,8 @@ def getDataframe(repositoryName, Bands="*", SRID=4326):
         params = config()
         # connect to the PostgreSQL database
         conn = psycopg2.connect(**params)
-        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) + ";"
+        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + \
+            Bands + " FROM " + str(repositoryName) + ";"
         dataFrameEnvelope = pd.read_sql_query(query, conn)
         print('Dataframe created')
         if Bands == "*":
@@ -467,7 +487,8 @@ def getDataframe(repositoryName, Bands="*", SRID=4326):
             conn.close()
             print('Repository connection closed.')
 
-def getDataframe(repositoryName,Bands="*", SRID=4326):
+
+def getDataframe(repositoryName, Bands="*", SRID=4326):
     """
     Get a dataframe from the database for a given envelope
 
@@ -487,7 +508,8 @@ def getDataframe(repositoryName,Bands="*", SRID=4326):
         params = config()
         # connect to the PostgreSQL database
         conn = psycopg2.connect(**params)
-        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) +";"
+        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + \
+            Bands + " FROM " + str(repositoryName) + ";"
         dataFrameEnvelope = pd.read_sql_query(query, conn)
         print('Dataframe created')
         if Bands == "*":
@@ -499,6 +521,7 @@ def getDataframe(repositoryName,Bands="*", SRID=4326):
         if conn is not None:
             conn.close()
             print('Repository connection closed.')
+
 
 def getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", SRID=4326):
     """
@@ -524,7 +547,8 @@ def getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", S
         params = config()
         # connect to the PostgreSQL database
         conn = psycopg2.connect(**params)
-        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) + " WHERE " + str(repositoryName) + ".geog && ST_MakeEnvelope(" + str(Xmin) + ',' + str(Ymin) + ',' + str(Xmax) + ',' + str(Ymax) + ");"
+        query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + Bands + " FROM " + str(repositoryName) + " WHERE " + str(
+            repositoryName) + ".geog && ST_MakeEnvelope(" + str(Xmin) + ',' + str(Ymin) + ',' + str(Xmax) + ',' + str(Ymax) + ");"
         dataFrameEnvelope = pd.read_sql_query(query, conn)
         print('Dataframe created')
         if Bands == "*":
@@ -536,6 +560,7 @@ def getDataframeForEnvelope(repositoryName, Xmin, Ymin, Xmax, Ymax, Bands="*", S
         if conn is not None:
             conn.close()
             print('Repository connection closed.')
+
 
 def kNearestPixels(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
     """
@@ -549,7 +574,7 @@ def kNearestPixels(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
     :param SRID: spatial reference ID
     """
     print('Getting dataframe from database')
-    
+
     try:
         conn = None
         # read database configuration
@@ -557,8 +582,8 @@ def kNearestPixels(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
         # connect to the PostgreSQL database
         conn = psycopg2.connect(**params)
         query = "SELECT ST_X(geog) as x, ST_Y(geog) as y, " + str(Bands) + " FROM " + str(
-        repositoryName) + " ORDER BY " + str(repositoryName) + ".geog <-> 'SRID=" + str(SRID) + ";POINT(" + str(
-        X) + ' ' + str(Y) + ")' limit " + str(k) + ";"
+            repositoryName) + " ORDER BY " + str(repositoryName) + ".geog <-> 'SRID=" + str(SRID) + ";POINT(" + str(
+            X) + ' ' + str(Y) + ")' limit " + str(k) + ";"
         dataFrameEnvelope = pd.read_sql_query(query, conn)
         print('Dataframe created')
         if Bands == "*":
@@ -570,6 +595,7 @@ def kNearestPixels(repositoryName, X, Y, k=1000, Bands="*", SRID=4326):
         if conn is not None:
             conn.close()
             print('Repository connection closed.')
+
 
 def getRasterForkNearestPixels(repositoryName, rasterFileName="rasterFile.nc", X=0, Y=0, k=1000, Bands="*"):
     """
@@ -588,6 +614,7 @@ def getRasterForkNearestPixels(repositoryName, rasterFileName="rasterFile.nc", X
     df = kNearestPixels(repositoryName, X, Y, k, Bands)
     dataFrame2Raster(df, rasterFileName)
 
+
 def getRepositorySize(tableName):
     """
 
@@ -599,7 +626,8 @@ def getRepositorySize(tableName):
         params = config()
         # connect to the PostgreSQL database
         conn = psycopg2.connect(**params)
-        query = "SELECT pg_size_pretty( pg_total_relation_size('" + tableName + "') );"
+        query = "SELECT pg_size_pretty( pg_total_relation_size('" + \
+            tableName + "') );"
         dataFrameEnvelope = pd.read_sql_query(query, conn)
         print(dataFrameEnvelope.iloc[0]['pg_size_pretty'])
         return dataFrameEnvelope.iloc[0]['pg_size_pretty']
@@ -627,7 +655,8 @@ def getSizeOfAllRepositories():
         q1 = "select current_database();"
         q2 = pd.read_sql_query(q1, conn)
 
-        query = " SELECT pg_size_pretty( pg_database_size('" + q2.iloc[0]['current_database'] + "') );"
+        query = " SELECT pg_size_pretty( pg_database_size('" + \
+            q2.iloc[0]['current_database'] + "') );"
         dataFrameEnvelope = pd.read_sql_query(query, conn)
         print(dataFrameEnvelope.iloc[0]['pg_size_pretty'])
         return dataFrameEnvelope.iloc[0]['pg_size_pretty']
