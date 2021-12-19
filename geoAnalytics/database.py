@@ -230,8 +230,8 @@ def insertRaster(repositoryName, fileName, totalBands, scalingFactor, SRID=4326)
     """
     tempFile = _r2tsv(totalBands, fileName, scalingFactor, SRID)
     insertCSV(tempFile, repositoryName)
-    #if os.path.exists(tempFile):
-        #os.remove(tempFile)
+    if os.path.exists(tempFile):
+        os.remove(tempFile)
 
 
 def insertRasterFolder(repositoryName, folderName, totalBands, scalingFactor, SRID=4326):
