@@ -162,8 +162,7 @@ def rasterOneNNMaxNorm(training, testing,topElements):
         for j in range(num_rows_train):
             maximum = float('-inf')
             for k in range(num_columns_train):
-                temp = pd.Series.abs(testing.iloc[i, k] - training.iloc[j, k])
-                # print(temp)
+                temp = np.abs(testing.iloc[i, k] - training.iloc[j, k])
                 if temp > maximum:
                     maximum = temp
             dist = maximum  # math.sqrt(squaring)
